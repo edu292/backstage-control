@@ -29,7 +29,7 @@ class Item(models.Model):
             output_field=models.DecimalField(max_digits=10, decimal_places=4)
         ),
         output_field=models.DecimalField(max_digits=10, decimal_places=4),
-        db_persist=False
+        db_persist=True
     )
 
     def __str__(self):
@@ -43,8 +43,8 @@ class EventoQuerySet(models.QuerySet):
                 models.Case(
                     models.When(transacoes__tipo=TipoTransacao.RETORNO_EVENTO, then=-models.F('transacoes__valor_total')),
                     default=models.F('transacoes__valor_total'),
-                    output_field=models.DecimalField(max_digits=10, decimal_places=4)
-                ),
+                    output_field=models.DecimalField(max_digits=10, decimal_places=2)
+                )
             )
         )
 
@@ -67,23 +67,19 @@ class Evento(models.Model):
     @property
     def custo_total(self):
         if hasattr(self, 'custo_total_calculado'):
-            return self.custo_total_calculado
+            return f'{self.custo_total_calculado:2f}'
 
-        custo_total = self.transacoes.filter(
-            tipo__in=(TipoTransacao.ALOCACAO_EVENTO, TipoTransacao.RETORNO_EVENTO)
-        ).annotate(
-            valor_total=models.F('quantidade') * models.F('preco_unidade')
-        ).aggregate(
+        custo_total = self.transacoes.aggregate(
             custo_total=models.Sum(
                 models.Case(
                     models.When(tipo=TipoTransacao.RETORNO_EVENTO, then=-models.F('valor_total')),
                     default=models.F('valor_total'),
-                    output_field=models.DecimalField(max_digits=10, decimal_places=4)
+                    output_field=models.DecimalField(max_digits=10, decimal_places=2)
                 )
             )
         )['custo_total']
 
-        return custo_total
+        return f'{custo_total:2f}'
 
     def __str__(self):
         return f'{self.nome} {self.data.strftime('%d/%m/%Y')}'
@@ -131,14 +127,15 @@ class TransacaoEstoque(models.Model):
         null=True,
         blank=True,
         db_index=True,
-        related_name='transacoes'
+        related_name='transacoes',
+        limit_choices_to={'status': Evento.Status.EM_ANDAMENTO}
     )
     responsavel = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, editable=False, null=True)
     nota = models.TextField(null=True, blank=True)
     valor_total = models.GeneratedField(
         expression=models.F('quantidade') * models.F('preco_unidade'),
-        db_persist=False,
-        output_field=models.DecimalField(max_digits=10, decimal_places=4)
+        output_field=models.DecimalField(max_digits=10, decimal_places=4),
+        db_persist=True
     )
 
     def clean(self):
@@ -218,7 +215,7 @@ class SolicitacaoEvento(models.Model):
     quantidade_alocada = models.IntegerField(default=0, editable=False)
     quantidade_faltando = models.GeneratedField(
         expression=models.F('quantidade_solicitada') - models.F('quantidade_alocada'),
-        db_persist=False,
+        db_persist=True,
         output_field=models.PositiveIntegerField()
     )
 
@@ -226,10 +223,10 @@ class SolicitacaoEvento(models.Model):
         if self.quantidade_solicitada and self.quantidade_solicitada < self.quantidade_alocada:
             raise ValidationError(
                 {
-                    'quantidade_solicitada': f'Já foram alocados {self.quantidade_alocada} itens, não é possível mudar '
+                    'quantidade_solicitada': f'Já foram alocados {self.quantidade_alocada} itens. Não é possível mudar '
                                               'a quantidade solicitada para menos que isso'
                 }
             )
 
     def __str__(self):
-        return f'{self.quantidade_solicitada} {self.item.nome}\'s para {self.evento}'
+        return f'{self.quantidade_solicitada} {self.item.nome}(s) para {self.evento}'

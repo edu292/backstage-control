@@ -1,5 +1,7 @@
 window.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById('transacaoestoque_form');
+    if (!form) return;
+
     let showConfirmDialog = true;
 
     const errorLists = form.querySelectorAll('.errorlist');

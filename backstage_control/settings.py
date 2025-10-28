@@ -28,9 +28,10 @@ environ.Env.read_env(BASE_DIR / '.env')
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env.bool('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
 
 
 # Application definition
@@ -62,14 +63,11 @@ HTTPS_ENABLED = env.bool('HTTPS_ENABLED')
 
 if HTTPS_ENABLED:
     # --- PROXY AND SSL SETTINGS ---
-    USE_X_FORWARDED_HOST = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
 
     # --- COOKIE SETTINGS ---
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
     CSRF_COOKIE_HTTPONLY = True
 
     # --- HSTS (HTTP Strict Transport Security) SETTINGS ---
@@ -77,19 +75,6 @@ if HTTPS_ENABLED:
 
     # --- OTHER SECURITY HEADERS ---
     SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-else:
-    # Settings for local development (HTTP)
-    USE_X_FORWARDED_HOST = False
-    SECURE_SSL_REDIRECT = False
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
-    SESSION_COOKIE_HTTPONLY = False
-    CSRF_COOKIE_HTTPONLY = False
-    SECURE_HSTS_SECONDS = 0
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-    SECURE_HSTS_PRELOAD = False
-    SECURE_CONTENT_TYPE_NOSNIFF = False
-    SECURE_REFERRER_POLICY = None
 
 
 ROOT_URLCONF = 'backstage_control.urls'
@@ -119,11 +104,10 @@ WSGI_APPLICATION = 'backstage_control.wsgi.application'
 DATABASES = {
     'default': dj_database_url.config(
         default=env('DATABASE_URL'),
-        conn_max_age=600
+        conn_max_age=600,
+        conn_health_checks=True
     )
 }
-
-CONN_HEALTH_CHECKS = True
 
 
 # Password validation

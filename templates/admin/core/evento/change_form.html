@@ -1,0 +1,39 @@
+{% extends "admin/change_form.html" %}
+
+{% block after_field_sets %}
+    {% if sumario_itens_evento %}
+    <div class="module">
+        <h1>Sumário dos Itens</h1>
+        <table style="width: 100%;">
+            <thead>
+            <tr>
+                <th style="width: 40%; text-align: left;">Nome</th>
+                <th style="width: 15%; text-align: right;">Qtd. Solicitada</th>
+                <th style="width: 15%; text-align: right;">Qtd. Alocada</th>
+                <th style="width: 15%; text-align: right;">Qtd. Consumida</th>
+                <th style="width: 15%; text-align: right;">Custo Item</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in sumario_itens_evento %}
+                <tr>
+                    <td>{{ item.item__nome }}</td>
+                    <td style="text-align: right;">{{ item.quantidade_solicitada }}</td>
+                    <td style="text-align: right;">{{ item.quantidade_alocada|default:0 }}</td>
+                    <td style="text-align: right;">{{ item.quantidade_consumida|default:0 }}</td>
+                    <td style="text-align: right;">{{ item.custo | floatformat:2 | default:'0,00' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot style="font-size: 1em">
+            <tr>
+                <th colspan="4" scope="row" style="font-size: 1.1em">Custo Total Evento:</th>
+                <td style="text-align: right; font-weight: bold; border-bottom: 1px solid var(--hairline-color); font-size: 1.1em">
+                    {{ original.custo_total | floatformat:2 }}
+                </td>
+            </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endif %}
+{% endblock %}

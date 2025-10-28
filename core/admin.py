@@ -28,9 +28,57 @@ def obter_id_evento_unico(queryset):
 @admin.register(Evento)
 class EventoAdmin(admin.ModelAdmin):
     search_fields = ('nome',)
-    list_display = ('nome', 'custo_total')
+    list_display = ('nome', 'data', 'custo_total')
     date_hierarchy = 'data'
     list_filter = ['status', ('data', DateRangeFilter)]
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        transacoes_subquery = TransacaoEstoque.objects.filter(
+            evento_id=object_id,
+            item_id=models.OuterRef('item_id')
+        )
+
+        sumario_itens_evento = SolicitacaoEvento.objects.filter(
+            evento_id=object_id
+        ).annotate(
+            quantidade_consumida=models.Subquery(
+                transacoes_subquery.annotate(
+                    quantidade_consumida=models.Sum(
+                        models.Case(
+                            models.When(tipo=TipoTransacao.RETORNO_EVENTO, then=-models.F('quantidade')),
+                            default=models.F('quantidade'),
+                            output_field=models.PositiveIntegerField()
+                        )
+                    )
+                ).values(
+                    'quantidade_consumida'
+                )
+            ),
+            custo=models.Subquery(
+                transacoes_subquery.annotate(
+                    custo=models.Sum(
+                        models.Case(
+                            models.When(tipo=TipoTransacao.RETORNO_EVENTO, then=-models.F('valor_total')),
+                            default=models.F('valor_total'),
+                            output_field=models.DecimalField(max_digits=10, decimal_places=2)
+                        )
+                    )
+                ).values(
+                    'custo'
+                )
+            )
+        ).values_list(
+            'item__nome',
+            'quantidade_solicitada',
+            'quantidade_alocada',
+            'quantidade_consumida',
+            'custo',
+            named=True
+        )
+
+        return super().change_view(
+            request, object_id, form_url, extra_context={'sumario_itens_evento': sumario_itens_evento},
+        )
 
     def has_delete_permission(self, request, obj=None):
         if obj and obj.itens_solicitados.filter(quantidade_alocada__gt=0):
@@ -42,12 +90,6 @@ class EventoAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
 
         return qs.com_custo_total()
-
-    def get_readonly_fields(self, request, obj=None):
-        if obj is not None:
-            return ('custo_total',)
-
-        return ()
 
     def get_exclude(self, request, obj=None):
         if obj is None:
@@ -310,6 +352,7 @@ class SolicitacaoEventoAdmin(admin.ModelAdmin):
 class ItemAdmin(admin.ModelAdmin):
     search_fields = ('nome',)
     list_display = ('nome', 'quantidade_em_estoque', 'valor_total')
+    ordering = ('-quantidade_em_estoque',)
 
     def has_delete_permission(self, request, obj: Item=None):
         if obj and obj.transacaoestoque_set.exists():
