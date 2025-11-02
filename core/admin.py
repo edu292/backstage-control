@@ -1,13 +1,13 @@
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
-from django.db import models, transaction
+from django.db import models
 from django.http import HttpResponse
 
 from rangefilter.filters import DateTimeRangeFilter, DateRangeFilter
 
 from .planilhas import gerar_checklist, gerar_lista_compras, gerar_custo_evento
-from .models import Evento, TransacaoEstoque, SolicitacaoEvento, Item, TipoTransacao
-from . import services
+from .models import Evento, TransacaoEstoque, SolicitacaoEvento, Item
+from .services import alocar_quantidade_disponivel_estoque_solicitacoes, retornar_item_de_evento, alocar_item_para_evento
 from .forms import TransacaoEstoqueAdminForm
 
 admin.site.disable_action('delete_selected')
@@ -33,40 +33,8 @@ class EventoAdmin(admin.ModelAdmin):
     list_filter = ['status', ('data', DateRangeFilter)]
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
-        transacoes_subquery = TransacaoEstoque.objects.filter(
-            evento_id=object_id,
-            item_id=models.OuterRef('item_id')
-        )
-
-        sumario_itens_evento = SolicitacaoEvento.objects.filter(
-            evento_id=object_id
-        ).annotate(
-            quantidade_consumida=models.Subquery(
-                transacoes_subquery.annotate(
-                    quantidade_consumida=models.Sum(
-                        models.Case(
-                            models.When(tipo=TipoTransacao.RETORNO_EVENTO, then=-models.F('quantidade')),
-                            default=models.F('quantidade'),
-                            output_field=models.PositiveIntegerField()
-                        )
-                    )
-                ).values(
-                    'quantidade_consumida'
-                )
-            ),
-            custo=models.Subquery(
-                transacoes_subquery.annotate(
-                    custo=models.Sum(
-                        models.Case(
-                            models.When(tipo=TipoTransacao.RETORNO_EVENTO, then=-models.F('valor_total')),
-                            default=models.F('valor_total'),
-                            output_field=models.DecimalField(max_digits=10, decimal_places=2)
-                        )
-                    )
-                ).values(
-                    'custo'
-                )
-            )
+        sumario_itens_evento = SolicitacaoEvento.objects.com_sumario_de_itens(
+            object_id
         ).values_list(
             'item__nome',
             'quantidade_solicitada',
@@ -81,7 +49,7 @@ class EventoAdmin(admin.ModelAdmin):
         )
 
     def has_delete_permission(self, request, obj=None):
-        if obj and obj.itens_solicitados.filter(quantidade_alocada__gt=0):
+        if obj and obj.solicitacoes.filter(quantidade_alocada__gt=0).exists():
             return False
 
         return True
@@ -147,11 +115,11 @@ class TransacaoEstoqueAdmin(admin.ModelAdmin):
         if not change:
             obj.responsavel = request.user
             match obj.tipo:
-                case TipoTransacao.ALOCACAO_EVENTO:
-                    services.alocar_item_para_evento(obj.item.id, obj.quantidade, obj.evento.id, obj.responsavel)
+                case TransacaoEstoque.Tipo.ALOCACAO_EVENTO:
+                    alocar_item_para_evento(obj.item.id, obj.quantidade, obj.evento.id, obj.responsavel)
                     return
-                case TipoTransacao.RETORNO_EVENTO:
-                    services.retornar_item_de_evento(obj.item.id, obj.quantidade, obj.evento.id, obj.responsavel)
+                case TransacaoEstoque.Tipo.RETORNO_EVENTO:
+                    retornar_item_de_evento(obj.item.id, obj.quantidade, obj.evento.id, obj.responsavel)
                     return
         super().save_model(request, obj, form, change)
 
@@ -166,23 +134,7 @@ class TransacaoEstoqueAdmin(admin.ModelAdmin):
         evento = Evento.objects.get(id=id_evento)
         titulo = evento.__str__()
 
-        lista_itens = queryset.order_by(
-        ).filter(
-            preco_unidade__gt=0
-        ).values(
-            'item',
-            'preco_unidade'
-        ).annotate(
-            quantidade_consumida=models.Sum(
-                models.Case(
-                    models.When(tipo=TipoTransacao.RETORNO_EVENTO, then=-models.F('quantidade')),
-                    default=models.F('quantidade'),
-                    output_field=models.PositiveIntegerField()
-                )
-            )
-        ).filter(
-            quantidade_consumida__gt=0
-        ).values_list('quantidade_consumida', 'item__nome', 'preco_unidade')
+        lista_itens = queryset.get_itens_consumidos_com_preco()
 
         planilha_custo_evento = gerar_custo_evento(lista_itens, titulo)
 
@@ -190,7 +142,7 @@ class TransacaoEstoqueAdmin(admin.ModelAdmin):
             planilha_custo_evento,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={
-                'Content-Disposition': f'attachment; filename=custo_evento_{titulo.replace(' ', '_')}.xlsx'
+                'Content-Disposition': f'attachment; filename=Custo Evento {titulo.replace('/', '-')}.xlsx'
             }
         )
 
@@ -200,7 +152,7 @@ class SolicitacaoEventoAdmin(admin.ModelAdmin):
     autocomplete_fields = ('evento', 'item')
     list_display = ('evento', 'item', 'quantidade_solicitada' ,'quantidade_alocada')
     list_filter = (EventosEmAndamentoFilter,)
-    actions = ('baixar_checklist_producao', 'alocar_estoque', 'baixar_lista_compras')
+    actions = ('alocar_estoque', 'baixar_checklist_producao', 'baixar_lista_compras')
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
@@ -240,71 +192,17 @@ class SolicitacaoEventoAdmin(admin.ModelAdmin):
         return HttpResponse(
             planilha,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            headers={'Content-Disposition': f'attachment; filename=checklist_{titulo.replace(' ', '_')}.xlsx'}
+            headers={'Content-Disposition': f'attachment; filename=Checklist {titulo.replace('/', '-')}.xlsx'}
         )
 
     @admin.action(description='Alocar quantidade disponível no estoque')
     def alocar_estoque(self, request, queryset):
         try:
-            id_evento = obter_id_evento_unico(queryset)
+            _ = obter_id_evento_unico(queryset)
         except ValidationError as e:
             self.message_user(request, e.message, messages.ERROR)
             return
-
-        solicitacoes = queryset
-        transacoes_para_criar = []
-        solicitacoes_para_atualizar = []
-        itens_para_atualizar = []
-
-        ids_itens_para_travar = {s.item_id for s in solicitacoes}
-
-        with transaction.atomic():
-            items_map = {
-                item.id: item for item in
-                Item.objects.select_for_update().filter(id__in=ids_itens_para_travar)
-            }
-
-            for solicitacao in solicitacoes:
-                item = items_map[solicitacao.item.id]
-
-                quantidade_a_alocar = min(item.quantidade_em_estoque, solicitacao.quantidade_faltando)
-
-                if quantidade_a_alocar <= 0:
-                    continue
-
-                item.quantidade_em_estoque -= quantidade_a_alocar
-                item.valor_total -= quantidade_a_alocar * item.preco_medio
-
-                itens_para_atualizar.append(item)
-
-                transacoes_para_criar.append(
-                    TransacaoEstoque(
-                        tipo=TipoTransacao.ALOCACAO_EVENTO,
-                        evento_id=id_evento,
-                        item=item,
-                        quantidade=quantidade_a_alocar,
-                        responsavel=request.user,
-                        preco_unidade=item.preco_medio
-                    )
-                )
-
-                solicitacao.quantidade_alocada += quantidade_a_alocar
-                solicitacoes_para_atualizar.append(solicitacao)
-
-            if itens_para_atualizar:
-                Item.objects.bulk_update(
-                    itens_para_atualizar,
-                    ['quantidade_em_estoque', 'valor_total']
-                )
-
-            if solicitacoes_para_atualizar:
-                SolicitacaoEvento.objects.bulk_update(
-                    solicitacoes_para_atualizar,
-                    ['quantidade_alocada']
-                )
-
-            if transacoes_para_criar:
-                TransacaoEstoque.objects.bulk_create(transacoes_para_criar)
+        alocar_quantidade_disponivel_estoque_solicitacoes(queryset, request.user)
 
     @admin.action(description='Gerar lista de compras')
     def baixar_lista_compras(self, request, queryset):
@@ -320,20 +218,13 @@ class SolicitacaoEventoAdmin(admin.ModelAdmin):
         itens_para_compra = queryset.filter(
             quantidade_faltando__gt=0
         ).annotate(
-            nome_item=models.F('item__nome'),
+            nome=models.F('item__nome'),
             ultimo_preco_unidade_pago=models.Subquery(
-                TransacaoEstoque.objects.filter(
-                    item_id=models.OuterRef('item_id'),
-                    tipo=TipoTransacao.COMPRA
-                ).order_by(
-                    '-timestamp'
-                ).values(
-                    'preco_unidade'
-                )[:1]
+                TransacaoEstoque.objects.ultimo_preco_unidade_pago(models.OuterRef('item_id'))
             )
         ).values_list(
             'quantidade_faltando',
-            'nome_item',
+            'nome',
             'ultimo_preco_unidade_pago'
         )
 
@@ -343,7 +234,7 @@ class SolicitacaoEventoAdmin(admin.ModelAdmin):
             planilha_lista_compras,
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             headers={
-                'Content-Disposition': f'attachment; filename=lista_compras_{titulo.replace(' ', '_')}.xlsx'
+                'Content-Disposition': f'attachment; filename=Lista Compras {titulo.replace('/', '-')}.xlsx'
             }
         )
 

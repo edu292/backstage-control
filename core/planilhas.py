@@ -67,6 +67,17 @@ def _setup_planilha(worksheet_name, nome_evento, col_span):
 
     worksheet.merge_range(0, 0, 0, col_span - 1, nome_evento, estilos['title'])
 
+    worksheet.repeat_rows(0, 1)
+
+    worksheet.set_portrait()
+    worksheet.set_paper(9)
+
+    worksheet.fit_to_pages(1, 0)
+
+    worksheet.center_horizontally()
+
+    worksheet.set_footer('&CPágina &P de &N')
+
     return output, workbook, worksheet, estilos
 
 
@@ -93,9 +104,9 @@ def gerar_checklist(lista_itens, nome_evento):
     for quantidade, item in lista_itens:
         worksheet.write(row, 0, quantidade, estilos['qty'])
         worksheet.write(row, 1, item, estilos['item'])
-        worksheet.insert_checkbox(row, 2, False)
-        worksheet.insert_checkbox(row, 3, False)
-        worksheet.insert_checkbox(row, 4, False)
+        worksheet.insert_checkbox(row, 2, False, estilos['qty'])
+        worksheet.insert_checkbox(row, 3, False, estilos['qty'])
+        worksheet.insert_checkbox(row, 4, False, estilos['qty'])
         row += 1
 
     return _finalizar_planilha(workbook, output)

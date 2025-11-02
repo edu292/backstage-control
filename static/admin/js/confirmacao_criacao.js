@@ -19,6 +19,7 @@ window.addEventListener("DOMContentLoaded", () => {
             if (!errorMessage.startsWith("CONFIRMACAO_JAVASCRIPT:")) {
                 showConfirmDialog = false;
             } else {
+                errorItem.style.display = 'none';
                 if (showConfirmDialog) {
                     errorList.style.display = 'none';
                     document.querySelector('.errornote').style.display = 'none';
@@ -30,8 +31,6 @@ window.addEventListener("DOMContentLoaded", () => {
                     } else {
                         history.go(-2);
                     }
-                } else {
-                    errorItem.style.display = 'none';
                 }
             }
         });
