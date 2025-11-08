@@ -12,7 +12,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 
-import dj_database_url
 import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -49,8 +48,6 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'compression_middleware.middleware.CompressionMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -64,6 +61,8 @@ HTTPS_ENABLED = env.bool('HTTPS_ENABLED')
 if HTTPS_ENABLED:
     # --- PROXY AND SSL SETTINGS ---
     SECURE_SSL_REDIRECT = True
+    USE_X_FORWARDED_HOST = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
     # --- COOKIE SETTINGS ---
     SESSION_COOKIE_SECURE = True
@@ -100,13 +99,19 @@ WSGI_APPLICATION = 'backstage_control.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
 DATABASES = {
-    'default': dj_database_url.config(
-        default=env('DATABASE_URL'),
-        conn_max_age=600,
-        conn_health_checks=True
-    )
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env('DB_NAME'),
+        "USER": env('DB_USER'),
+        "PASSWORD": env('DB_PASSWORD'),
+        "PORT": env('DB_PORT'),
+        "HOST": env('DB_HOST'),
+        "CONN_MAX_AGE": 0,
+        "OPTIONS": {
+            "pool": True
+        }
+    }
 }
 
 
@@ -143,6 +148,12 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
+STORAGES = {
+    # ...
+    "staticfiles": {
+        "BACKEND": "compress_staticfiles.storage.CompressStaticFilesStorage",
+    },
+}
 
 STATIC_URL = 'static/'
 
@@ -151,11 +162,6 @@ STATICFILES_DIRS = [
 ]
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STORAGES = {
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

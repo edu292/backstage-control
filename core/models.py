@@ -60,7 +60,7 @@ class Item(models.Model):
             output_field=models.DecimalField(max_digits=10, decimal_places=4)
         ),
         output_field=models.DecimalField(max_digits=10, decimal_places=4),
-        db_persist=False
+        db_persist=True
     )
 
     def __str__(self):
@@ -138,7 +138,7 @@ class TransacaoEstoque(models.Model):
     valor_total = models.GeneratedField(
         expression=models.F('quantidade') * models.F('preco_unidade'),
         output_field=models.DecimalField(max_digits=10, decimal_places=4),
-        db_persist=False
+        db_persist=True
     )
 
     def clean(self):
@@ -309,7 +309,7 @@ class SolicitacaoEvento(models.Model):
     quantidade_alocada = models.IntegerField(default=0, editable=False)
     quantidade_faltando = models.GeneratedField(
         expression=models.F('quantidade_solicitada') - models.F('quantidade_alocada'),
-        db_persist=False,
+        db_persist=True,
         output_field=models.PositiveIntegerField()
     )
 
