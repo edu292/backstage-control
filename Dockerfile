@@ -14,15 +14,15 @@ COPY src .
 
 FROM base AS builder
 
+COPY compress-and-minify-staticfiles.py .
+
 RUN apt-get update && apt-get install -y \
     curl \
     brotli
 
 RUN curl -fsSL https://esbuild.github.io/dl/v0.25.12 | sh
 
-COPY compress-and-minify-staticfiles.py .
-COPY static .
-
+COPY static ./static
 RUN python manage.py collectstatic --no-input
 
 RUN python compress-and-minify-staticfiles.py
