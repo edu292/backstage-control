@@ -24,13 +24,13 @@ environ.Env.read_env(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = env('SECRET_KEY', default='')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool('DEBUG')
+DEBUG = env.bool('DEBUG', default=False)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default='')
 
 
 # Application definition
@@ -56,7 +56,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-HTTPS_ENABLED = env.bool('HTTPS_ENABLED')
+HTTPS_ENABLED = env.bool('HTTPS_ENABLED', default=True)
 
 if HTTPS_ENABLED:
     # --- PROXY AND SSL SETTINGS ---
@@ -81,7 +81,7 @@ ROOT_URLCONF = 'backstage_control.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates']
+        'DIRS': [BASE_DIR / 'src/templates']
         ,
         'APP_DIRS': True,
         'OPTIONS': {
@@ -102,11 +102,11 @@ WSGI_APPLICATION = 'backstage_control.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": env('DB_NAME'),
-        "USER": env('DB_USER'),
-        "PASSWORD": env('DB_PASSWORD'),
-        "PORT": env('DB_PORT'),
-        "HOST": env('DB_HOST'),
+        "NAME": env('DB_NAME', default=''),
+        "USER": env('DB_USER', default=''),
+        "PASSWORD": env('DB_PASSWORD', default=''),
+        "PORT": env('DB_PORT', default=''),
+        "HOST": env('DB_HOST', default=''),
         "CONN_MAX_AGE": 0,
         "OPTIONS": {
             "pool": True
@@ -151,7 +151,7 @@ USE_TZ = True
 STORAGES = {
     # ...
     "staticfiles": {
-        "BACKEND": "compress_staticfiles.storage.CompressStaticFilesStorage",
+        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
     },
 }
 

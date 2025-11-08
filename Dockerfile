@@ -1,4 +1,6 @@
-FROM python:3.13.9-slim-trixie
+FROM python:3.14.0-slim-trixie AS base
+
+LABEL org.opencontainers.image.source=https://github.com/edu292/backstage-control
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -8,6 +10,25 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-deps --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY src .
+
+FROM base AS builder
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    brotli
+
+RUN curl -fsSL https://esbuild.github.io/dl/v0.25.12 | sh
+
+COPY compress-and-minify-staticfiles.py .
+COPY static .
+
+RUN python manage.py collectstatic --no-input
+
+RUN python compress-and-minify-staticfiles.py
+
+FROM base AS final
+
+COPY --from=builder /app/staticfiles ./staticfiles
 
 CMD ["granian", "--interface", "wsgi", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--backpressure", "7", "backstage_control.wsgi:application"]

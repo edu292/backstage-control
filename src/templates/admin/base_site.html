@@ -1,0 +1,7 @@
+{% extends "admin/../../../.venv/Lib/site-packages/django/contrib/admin/templates/admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    {% include '../favicons.html' %}
+{% endblock %}
