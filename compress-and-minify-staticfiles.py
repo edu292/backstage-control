@@ -1,11 +1,11 @@
 from pathlib import Path
 from subprocess import run
-from re import compile
+from re import compile, IGNORECASE
 
 MINIMUM_ORIGINAL_SIZE_FOR_COMPRESSION = 1400
 EXTENSIONS_TO_COMPRESS = {'.css', '.js', '.svg', '.ico'}
 EXTENSIONS_TO_MINIFY = {'.css', '.js'}
-HASH_REGEX = compile(r'\.[a-zA-Z0-9]{12,}\.')
+HASH_REGEX = compile(r'\.([a-f0-9]{8,})\.', IGNORECASE)
 
 staticfiles_folder = Path.cwd() / 'staticfiles'
 manifest_file = staticfiles_folder / 'staticfiles.json'
