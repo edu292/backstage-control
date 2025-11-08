@@ -29,6 +29,6 @@ RUN python compress-and-minify-staticfiles.py
 
 FROM base AS final
 
-COPY --from=builder /app/staticfiles ./staticfiles
+COPY --from=builder /app/staticfiles ./temp_staticfiles
 
 CMD ["granian", "--interface", "wsgi", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--backpressure", "7", "backstage_control.wsgi:application"]
