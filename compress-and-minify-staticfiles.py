@@ -28,7 +28,7 @@ for file in staticfiles_folder.rglob('*.*'):
     path_to_file = str(file)
 
     if extension in EXTENSIONS_TO_MINIFY:
-        run(['./esbuild', path_to_file, '--minify', f'--outfile={path_to_file}', '--allow-overwrite'])
+        run(['./esbuild', path_to_file, '--minify', f'--outfile={path_to_file}', '--allow-overwrite', '--log-level=error'])
 
     run(['brotli', '--best', path_to_file])
     run(['gzip', '--best', path_to_file])
