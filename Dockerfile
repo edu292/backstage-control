@@ -16,7 +16,8 @@ FROM base AS builder
 
 COPY compress-and-minify-staticfiles.sh .
 
-RUN apt-get update && apt-get install -y \
+RUN chmod +x compress-and-minify-staticfiles.sh && \
+    apt-get update && apt-get install -y \
     curl \
     brotli \
     gzip
