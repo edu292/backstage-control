@@ -25,7 +25,7 @@ RUN curl -fsSL https://esbuild.github.io/dl/v0.25.12 | sh
 COPY static ./static
 RUN python manage.py collectstatic --no-input
 
-RUN python compress-and-minify-staticfiles.py
+RUN python compress-and-minify-staticfiles.sh
 
 FROM base AS final
 

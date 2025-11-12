@@ -31,4 +31,4 @@ for file in staticfiles_folder.rglob('*.*'):
         run(['./esbuild', path_to_file, '--minify', f'--outfile={path_to_file}', '--allow-overwrite', '--log-level=error'])
 
     run(['brotli', '--best', path_to_file])
-    run(['gzip', '--best', '--keep',path_to_file])
+    run(['gzip', '--best', '--keep', path_to_file])
