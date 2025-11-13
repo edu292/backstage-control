@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
-
-set -euox
+set -euo
 
 MINIMUM_SIZE=1400
 STATICFILES_DIR="staticfiles"
-
 MANIFEST_FILE="$STATICFILES_DIR/staticfiles.json"
 HASH_REGEX='\.[a-fA-F0-9]{8,}\.'
 
 declare -A EXTENSIONS_TO_COMPRESS
 declare -A EXTENSIONS_TO_MINIFY
-
 EXTENSIONS_TO_COMPRESS=([css]=1 [js]=1 [svg]=1 [ico]=1)
 EXTENSIONS_TO_MINIFY=([css]=1 [js]=1)
 
@@ -42,7 +39,6 @@ for file in "$STATICFILES_DIR"/**/*.*; do
   fi
 
   if [[ -n "${EXTENSIONS_TO_MINIFY[$extension]:-}" ]]; then
-    echo "  -> Minifying (esbuild)..."
     ./esbuild "$file" --minify "--outfile=$file" --allow-overwrite --log-level=error
   fi
 
